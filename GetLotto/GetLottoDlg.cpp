@@ -14,6 +14,9 @@
 #endif
 
 
+HttpClient m_httpClient;
+
+
 // 對 App About 使用 CAboutDlg 對話方塊
 
 class CAboutDlg : public CDialogEx
@@ -21,13 +24,13 @@ class CAboutDlg : public CDialogEx
 public:
 	CAboutDlg();
 
-// 對話方塊資料
+	// 對話方塊資料
 	enum { IDD = IDD_ABOUTBOX };
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支援
 
-// 程式碼實作
+	// 程式碼實作
 protected:
 	DECLARE_MESSAGE_MAP()
 };
@@ -68,7 +71,7 @@ BEGIN_MESSAGE_MAP(CGetLottoDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
-	
+
 	ON_BN_CLICKED(IDC_BUTTON_GET_SOURCE, &CGetLottoDlg::OnBnClickedButtonGetSource)
 END_MESSAGE_MAP()
 
@@ -105,6 +108,8 @@ BOOL CGetLottoDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 設定小圖示
 
 	// TODO:  在此加入額外的初始設定
+	Sql.OpenDb(_T("GetLotto.db"));
+	Sql.Execute(_T("CREATE TABLE big_lotto([no] VARCHAR(255) PRIMARY KEY,[opendate] VARCHAR(255),[closedate] VARCHAR(255),[number] VARCHAR(255),[number_1] VARCHAR(255),[number_2] VARCHAR(255),[number_3] VARCHAR(255),[number_4] VARCHAR(255),[number_5] VARCHAR(255),[number_6] VARCHAR(255),[number_sp] VARCHAR(255));"));
 
 	return TRUE;  // 傳回 TRUE，除非您對控制項設定焦點
 }
@@ -161,107 +166,284 @@ HCURSOR CGetLottoDlg::OnQueryDragIcon()
 
 void CGetLottoDlg::OnBnClickedButtonGetSource()
 {
-	
-	
-	EVENTVALIDATION = getEVENTVALIDATION();
-	VIEWSTATE = getVIEWSTATE();
-
-	CString  myParameters = getParameters( 1, 104);
+	NumberPeriod numberPeriod[20];
 
 	
 
-	HttpClient m_httpClient;
-	//strHTML = m_httpClient.HTTPGet(strURL, TRUE, NULL, &m_httpClient.g_cookie);
-	
-	strHTML = m_httpClient.HTTPPost(strURL, myParameters, TRUE, NULL, &m_httpClient.g_cookie);
+	CTime currTime = CTime::GetCurrentTime();
+	int iYear = (int)currTime.GetYear();
+	int iYearTw = iYear - 1911;
+
+	for (int yy = 103; yy <= iYearTw; yy++)
+	{
+		for (int mm = 1; mm <= 12; mm++)
+		{
+			getNumberPeriod(numberPeriod, mm, yy);
+			InsertNum(numberPeriod);
+		}
+	}
 
 	UpdateData(FALSE);
+
+}
+
+
+void CGetLottoDlg::InsertNum(NumberPeriod* n)
+{
+	//bool result = false;
+
+	CString sql = L"insert into big_lotto( [no],[opendate],[closedate],[number],[number_1],[number_2],[number_3],[number_4],[number_5],[number_6],[number_sp]) values('@no','@opendate', '@closedate', '@number_all', '@number_1', '@number_2', '@number_3', '@number_4' , '@number_5', '@number_6', '@number_sp') ";
+	for (int i = 0; i < 20; i++)
+	{
+		if (!n[i].no.IsEmpty())
+		{
+			Table tb = Sql.Select(L"big_lotto", L"*", L"where no = '" + n[i].no + L"' ");
+			BOOL isExist = (tb.GetRowCount() > 0) ? TRUE : FALSE;
+			if (!isExist)
+			{
+
+				CString sql_tmp = sql;
+
+				sql_tmp.Replace(L"@no", n[i].no);
+				sql_tmp.Replace(L"@opendate", n[i].dateStart);
+				sql_tmp.Replace(L"@closedate", n[i].dateClose);
+				sql_tmp.Replace(L"@number_all", n[i].number1 + n[i].number2 + n[i].number3 + n[i].number4 + n[i].number5 + n[i].number6 + n[i].numberSP);
+				sql_tmp.Replace(L"@number_1", n[i].number1);
+				sql_tmp.Replace(L"@number_2", n[i].number2);
+				sql_tmp.Replace(L"@number_3", n[i].number3);
+				sql_tmp.Replace(L"@number_4", n[i].number4);
+				sql_tmp.Replace(L"@number_5", n[i].number5);
+				sql_tmp.Replace(L"@number_6", n[i].number6);
+				sql_tmp.Replace(L"@number_sp", n[i].numberSP);
+
+				Sql.Execute(sql_tmp);
+				//result = true;
+
+			}
+		}
+	}
+
+
+	//return result;
+}
+
+
+void CGetLottoDlg::getNumberPeriod(NumberPeriod* numberPeriod, int month, int year)
+{
+
+
+	CString  myParameters = getParameters(month, year);
+
+	CString strMyHTML = m_httpClient.HTTPPost(strURL, myParameters, TRUE, NULL, &m_httpClient.g_cookie);
+
+	CString strMainHTML = getNumberMain(strMyHTML);
+
+	CStringArray words ;
+	LPCTSTR slipt = L"期別";
+	SplitString(words, strMainHTML, slipt);
+
+	if (words.GetSize() > 2)
+	{
+
+
+		for (int i = 1; i < words.GetSize(); i++) //第0個是垃圾訊息
+		{
+			CString strWord = words[i];
+			numberPeriod[words.GetSize() - (i - 1)].no = getNo(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].dateStart = getStart(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].dateClose = getClose(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].number1 = getNumber1(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].number2 = getNumber2(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].number3 = getNumber3(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].number4 = getNumber4(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].number5 = getNumber5(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].number6 = getNumber6(strWord);
+			numberPeriod[words.GetSize() - (i - 1)].numberSP = getNumberSP(strWord);
+		}
+	}
+}
+
+
+
+void CGetLottoDlg::SplitString(CStringArray& dst, const CString& src, LPCTSTR slipt)
+{
+	dst.RemoveAll();
+	const int len = _tcslen(slipt);
+
+	int start = 0, end = 0;
+	while ((end = src.Find(slipt, end)) != -1)
+	{
+		dst.Add(src.Mid(start, end - start));
+		start = end += len;
+	}
+	dst.Add(src.Right(src.GetLength() - start));
 }
 
 
 CString CGetLottoDlg::getParameters(int month, int year)
 {
+
+	strHTML = m_httpClient.HTTPGet(strURL, TRUE, NULL, &m_httpClient.g_cookie);
+	EVENTVALIDATION = getEVENTVALIDATION();
+	VIEWSTATE = getVIEWSTATE();
+
 	CString strMonth;
 	strMonth.Format(L"%d", month);
 
 	CString strYear;
 	strYear.Format(L"%d", year);
 
-	CString type = L"Lotto649Control_history%24DropDownList1=2";
-	CString btn = L"&Lotto649Control_history%24btnSubmit=%E6%9F%A5%E8%A9%A2";
-	CString radYM = L"&Lotto649Control_history%24chk=radYM";
-	CString mmm = L"&Lotto649Control_history%24dropMonth=" + strMonth;
-	CString yyy = L"&Lotto649Control_history%24dropYear=" + strYear;
-	CString other = L"&__EVENTARGUMENT=&__EVENTTARGET=";
-	CString key1 = L"&__EVENTVALIDATION=" + UrlEncode(EVENTVALIDATION);
-	CString key2 = L"&__LASTFOCUS=&__VIEWSTATE=" + UrlEncode(VIEWSTATE);
-	//CString end = L"&__VIEWSTATEENCRYPTED=";
+	CString str1 = L"__EVENTTARGET=&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE=" + m_httpClient.EncodeURI(VIEWSTATE);
+	CString str2 = L"&__EVENTVALIDATION=" + m_httpClient.EncodeURI(EVENTVALIDATION);
+	CString str3 = L"&Lotto649Control_history%24DropDownList1=2&Lotto649Control_history%24chk=radYM&Lotto649Control_history%24dropYear=" + strYear;
+	CString str4 = L"&Lotto649Control_history%24dropMonth=" + strMonth;
+	CString str5 = L"&Lotto649Control_history%24btnSubmit=%E6%9F%A5%E8%A9%A2";
 
-	return type + btn + radYM + mmm + yyy + other + key1 + key2;// +end;
+	return str1 + str2 + str3 + str4 + str5;
 
 }
 
 
 CString CGetLottoDlg::getEVENTVALIDATION()
 {
-	CString output = strHTML;
-	
-	output = GetInner(output, L"__EVENTVALIDATION", L"<div id=\"wrapper\">");
-	output = GetInner(output, L"value=\"", L"\" />");
-	output.Replace(L"value=\"", L"");
+	CString strOutput = strHTML;
 
-	return output;
+	strOutput = GetInner(strOutput, L"__EVENTVALIDATION", L"<div id=\"wrapper\">");
+	strOutput = GetInner(strOutput, L"value=\"", L"\" />");
+	strOutput.Replace(L"value=\"", L"");
+
+	return strOutput;
 }
 
 CString CGetLottoDlg::getVIEWSTATE()
 {
-	CString output = strHTML;
-	
-	output = GetInner(output, L"__VIEWSTATE", L"__EVENTVALIDATION");
-	output = GetInner(output, L"value=\"", L"\" />");
-	output.Replace(L"value=\"", L"");
+	CString strOutput = strHTML;
 
-	return output;
+	strOutput = GetInner(strOutput, L"__VIEWSTATE", L"__EVENTVALIDATION");
+	strOutput = GetInner(strOutput, L"value=\"", L"\" />");
+	strOutput.Replace(L"value=\"", L"");
+
+	return strOutput;
 }
 
+
+
+CString CGetLottoDlg::getNumberSP(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_No7_", L"大小順序");
+	strOutput = GetInner(strOutput, L"\">", L"</span></span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+CString CGetLottoDlg::getNumber6(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_SNo6_", L"Lotto649Control_history_dlQuery_No7_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+CString CGetLottoDlg::getNumber5(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_SNo5_", L"Lotto649Control_history_dlQuery_SNo6_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getNumber4(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_SNo4_", L"Lotto649Control_history_dlQuery_SNo5_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getNumber3(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_SNo3_", L"Lotto649Control_history_dlQuery_SNo4_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getNumber2(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_SNo2_", L"Lotto649Control_history_dlQuery_SNo3_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getNumber1(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_SNo1_", L"Lotto649Control_history_dlQuery_SNo2_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getClose(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_L649_EDate_", L"Lotto649Control_history_dlQuery_L649_SellAmount_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getStart(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_L649_DDate_", L"Lotto649Control_history_dlQuery_L649_EDate_");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getNo(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"Lotto649Control_history_dlQuery_L649_DrawTerm_", L"Lotto649Control_history1_dlQuery_ctl00_L649_DDate");
+	strOutput = GetInner(strOutput, L"\">", L"</span>");
+	strOutput.Replace(L"\">", L"");
+	return strOutput;
+}
+
+CString CGetLottoDlg::getNumberMain(CString output)
+{
+	CString strOutput = output;
+	strOutput = GetInner(strOutput, L"月的中獎號碼", L"註：");
+	strOutput = GetInner(strOutput, L"大樂透", L"<div class=\"intx01\">");
+	strOutput.Replace(L"\r\n", L"");
+	strOutput.Replace(L"  ", L"");
+	strOutput.Replace(L"&nbsp;", L"");
+	return strOutput;
+}
 
 CString CGetLottoDlg::GetInner(CString htmls, CString ff, CString ll)
 {
 	int first = htmls.Find(ff);
-	int last = htmls.Find(ll); 
+	int last = htmls.Find(ll);
 	CString output = htmls.Mid(first, last - first);
 	return output;
 }
 
 
 
-CString CGetLottoDlg::UrlEncode(CString url)
+
+
+
+
+BOOL CGetLottoDlg::DestroyWindow()
 {
-	url.Replace(_T("%"), _T("%25"));
-	url.Replace(_T("!"), _T("%21"));
-	url.Replace(_T("*"), _T("%2A"));
-	url.Replace(_T("'"), _T("%27"));
-	url.Replace(_T("("), _T("%28"));
-	url.Replace(_T(")"), _T("%29"));
-	url.Replace(_T(";"), _T("%3B"));
-	url.Replace(_T(":"), _T("%3A"));
-	url.Replace(_T("@"), _T("%40"));
-	url.Replace(_T("&"), _T("%26"));
-	url.Replace(_T("="), _T("%3D"));
-	url.Replace(_T("+"), _T("%2B"));
-	url.Replace(_T("$"), _T("%24"));
-	url.Replace(_T(","), _T("%2C"));
-	url.Replace(_T("/"), _T("%2F"));
-	url.Replace(_T("?"), _T("%3F"));
-	url.Replace(_T("#"), _T("%23"));
-	url.Replace(_T("["), _T("%5B"));
-	url.Replace(_T("]"), _T("%5D"));
-	url.Replace(_T(" "), _T("%20"));
-	url.Replace(_T("\r\n"), _T("%2C"));
-	url.Replace(_T("\n"), _T("%2C"));
-	url.Replace(_T("\""), _T("%22"));
-
-	return url;
+	// TODO: Add your specialized code here and/or call the base class
+	Sql.CloseDb();
+	return CDialogEx::DestroyWindow();
 }
-
-
