@@ -54,8 +54,7 @@ END_MESSAGE_MAP()
 
 CGetLottoDlg::CGetLottoDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CGetLottoDlg::IDD, pParent)
-	, strURL(_T("http://www.taiwanlottery.com.tw/Lotto/Lotto649/history.aspx"))
-	, strHTML(_T(""))
+	//, strURL(_T("http://www.taiwanlottery.com.tw/Lotto/Lotto649/history.aspx"))	
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -63,8 +62,8 @@ CGetLottoDlg::CGetLottoDlg(CWnd* pParent /*=NULL*/)
 void CGetLottoDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Text(pDX, IDC_EDIT_URL, strURL);
-	DDX_Text(pDX, IDC_EDIT_HTML, strHTML);
+	//DDX_Text(pDX, IDC_EDIT_URL, strURL);
+	DDX_Control(pDX, IDC_PROGRESS1, m_myProgress);
 }
 
 BEGIN_MESSAGE_MAP(CGetLottoDlg, CDialogEx)
@@ -110,6 +109,21 @@ BOOL CGetLottoDlg::OnInitDialog()
 	// TODO:  在此加入額外的初始設定
 	Sql.OpenDb(_T("GetLotto.db"));
 	Sql.Execute(_T("CREATE TABLE big_lotto([no] VARCHAR(255) PRIMARY KEY,[opendate] VARCHAR(255),[closedate] VARCHAR(255),[number] VARCHAR(255),[number_1] VARCHAR(255),[number_2] VARCHAR(255),[number_3] VARCHAR(255),[number_4] VARCHAR(255),[number_5] VARCHAR(255),[number_6] VARCHAR(255),[number_sp] VARCHAR(255));"));
+	strURL = L"http://www.taiwanlottery.com.tw/Lotto/Lotto649/history.aspx";
+	m_myProgress.SetPos(0);
+	
+	int iTotalProgress = 0;
+	CTime currTime = CTime::GetCurrentTime();
+	int iYear = (int)currTime.GetYear();
+	int iYearTw = iYear - 1911;
+	for (int yy = 103; yy <= iYearTw; yy++)
+	{
+		for (int mm = 1; mm <= 12; mm++)
+		{
+			iTotalProgress++;
+		}
+	}
+	m_myProgress.SetRange(0, iTotalProgress);
 
 	return TRUE;  // 傳回 TRUE，除非您對控制項設定焦點
 }
@@ -166,10 +180,13 @@ HCURSOR CGetLottoDlg::OnQueryDragIcon()
 
 void CGetLottoDlg::OnBnClickedButtonGetSource()
 {
+	
+	GetDlgItem(IDC_BUTTON_GET_SOURCE)->EnableWindow(FALSE);
 	NumberPeriod numberPeriod[20];
 
+	//Progress bar	
 	
-
+	int iPercentage = 0;
 	CTime currTime = CTime::GetCurrentTime();
 	int iYear = (int)currTime.GetYear();
 	int iYearTw = iYear - 1911;
@@ -178,12 +195,17 @@ void CGetLottoDlg::OnBnClickedButtonGetSource()
 	{
 		for (int mm = 1; mm <= 12; mm++)
 		{
+			
 			getNumberPeriod(numberPeriod, mm, yy);
 			InsertNum(numberPeriod);
+
+			iPercentage++;
+			m_myProgress.SetPos(iPercentage);
 		}
 	}
 
 	UpdateData(FALSE);
+	GetDlgItem(IDC_BUTTON_GET_SOURCE)->EnableWindow(TRUE);
 
 }
 
@@ -282,10 +304,9 @@ void CGetLottoDlg::SplitString(CStringArray& dst, const CString& src, LPCTSTR sl
 
 CString CGetLottoDlg::getParameters(int month, int year)
 {
-
-	strHTML = m_httpClient.HTTPGet(strURL, TRUE, NULL, &m_httpClient.g_cookie);
-	EVENTVALIDATION = getEVENTVALIDATION();
-	VIEWSTATE = getVIEWSTATE();
+	CString strHTML = m_httpClient.HTTPGet(strURL, TRUE, NULL, &m_httpClient.g_cookie);
+	EVENTVALIDATION = getEVENTVALIDATION(strHTML);
+	VIEWSTATE = getVIEWSTATE(strHTML);
 
 	CString strMonth;
 	strMonth.Format(L"%d", month);
@@ -304,7 +325,7 @@ CString CGetLottoDlg::getParameters(int month, int year)
 }
 
 
-CString CGetLottoDlg::getEVENTVALIDATION()
+CString CGetLottoDlg::getEVENTVALIDATION(CString strHTML)
 {
 	CString strOutput = strHTML;
 
@@ -315,7 +336,7 @@ CString CGetLottoDlg::getEVENTVALIDATION()
 	return strOutput;
 }
 
-CString CGetLottoDlg::getVIEWSTATE()
+CString CGetLottoDlg::getVIEWSTATE(CString strHTML)
 {
 	CString strOutput = strHTML;
 

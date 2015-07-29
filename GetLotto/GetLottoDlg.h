@@ -4,6 +4,7 @@
 
 #pragma once
 #include "SqlOperator.h"
+#include "afxcmn.h"
 
 
 struct NumberPeriod
@@ -47,7 +48,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	CString strURL;
-	CString strHTML;	
+		
 
 	
 
@@ -56,8 +57,8 @@ public:
 	void CGetLottoDlg::getNumberPeriod(NumberPeriod* numPeriod, int month, int year);
 	void CGetLottoDlg::SplitString(CStringArray& dst, const CString& src, LPCTSTR slipt);
 	CString CGetLottoDlg::getParameters(int month, int year);
-	CString CGetLottoDlg::getEVENTVALIDATION();
-	CString CGetLottoDlg::getVIEWSTATE();
+	CString CGetLottoDlg::getEVENTVALIDATION(CString strHTML);
+	CString CGetLottoDlg::getVIEWSTATE(CString strHTML);
 	CString CGetLottoDlg::GetInner(CString htmls, CString ff, CString ll);
 	
 
@@ -75,4 +76,5 @@ public:
 	CString EVENTVALIDATION;
 	CString VIEWSTATE;
 	virtual BOOL DestroyWindow();
+	CProgressCtrl m_myProgress;
 };
