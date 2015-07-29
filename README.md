@@ -1,10 +1,10 @@
 # GetLotto
 
-![](http://i.imgur.com/x9omxEn.png)
-
-## 使用效果 ##
-
 ![](http://i.imgur.com/YGvED01.png)
+
+[Google硬碟下載](https://drive.google.com/open?id=0BzUSEyOU2e3zVDcwRkIyZ1Z2ajA)
+
+## 用途 ##
 
 產生一個sqlite檔案
 
